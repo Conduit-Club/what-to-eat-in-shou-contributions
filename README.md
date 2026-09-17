@@ -14,7 +14,7 @@ pixi run check
 pixi run start
 ```
 
-默认运行在 `http://localhost:3001`，使用 `.data/private` 作为仅适于本地开发的私有存储目录和内存投稿仓储。生产部署必须替换为 PostgreSQL、S3 兼容私有存储，并设置 HTTPS、`ALLOWED_ORIGINS` 与强随机 `REVIEWER_TOKENS`；不要将 `.data/` 或环境文件提交到仓库。
+默认运行在 `http://localhost:3001`，使用 `.data/private` 作为仅适于本地开发的私有存储目录和内存投稿仓储。生产设置 `DATABASE_URL` 后必须同时设置 `S3_BUCKET`、`S3_REGION`、`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY`（可选 `S3_ENDPOINT`），服务会自动建表并切换到 PostgreSQL/S3。另须设置 HTTPS、逗号分隔的 `ALLOWED_ORIGINS` 与强随机 `REVIEWER_TOKENS`；不要将 `.data/` 或环境文件提交到仓库。
 
 ## API
 

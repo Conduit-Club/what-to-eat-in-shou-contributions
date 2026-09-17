@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/main.js",
     "test": "node --test",
-    "check": "node --check src/main.js && node --check src/http/server.js"
+    "check": "node --check src/main.js && node --check src/errors.js && node --check src/domain/metadata.js && node --check src/domain/image.js && node --check src/http/multipart.js && node --check src/http/server.js && node --check src/adapters/repository.js && node --check src/adapters/storage.js && node --check src/adapters/postgres.js && node --check src/adapters/s3.js"
   },
   "engines": {
     "node": ">=20"
