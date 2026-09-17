@@ -1,5 +1,17 @@
 # what-to-eat-in-shou-contributions
 
+当前前端集成能力：批准接口要求 `publicFields.id`（稳定餐厅标识）和
+`publicFields.imageApproved`（明确的图片公开决定）。公开 `updatedAt` 默认 `null`，
+仅在实际核验事实时填写，不能使用投稿记录更新时间代替。
+
+`src/export/site-plan.js` 的 `createNewRestaurantPlan({record, image, site})`
+为新店生成快照、详情、索引、侧边栏及可选图片的内存变更清单。
+`site` 提供 `restaurantsJson`、`categoryIndex`、`sidebars` 和完整的 `existingPaths`；
+`image.buffer` 必须是审核通过的处理后图片。调用方负责提供同一站点版本的输入。
+重复餐厅 ID 或详情路径会拒绝生成；只支持包含静态文档 ID 的侧边栏分类列表。
+此函数不写文件、不创建 PR。已有餐厅追加、导出审计和可重试的 GitHub PR 工作流尚未实现。
+计划器测试尚不能替代站点构建及图片授权的人工核验。
+
 “今日海大吃什么”的独立贡献服务。它接收匿名投稿，在私有区域保存待审图片，并提供受认证保护的审核 API；公开站点始终从审核后的 Git 快照构建。
 
 ## 环境与命令
