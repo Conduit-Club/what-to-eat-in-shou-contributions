@@ -1,0 +1,16 @@
+[workspace]
+authors = ["Conduit Club"]
+channels = ["conda-forge"]
+name = "what-to-eat-in-shou-contributions"
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+version = "0.1.0"
+
+[dependencies]
+nodejs = ">=22,<23"
+pnpm = ">=10,<11"
+
+[tasks]
+install = "pnpm install --lockfile-only"
+test = "pnpm test"
+check = "pnpm check"
+start = "pnpm start"
