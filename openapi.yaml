@@ -35,8 +35,35 @@ paths:
           name: id
           required: true
           schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/Approval'
+                - $ref: '#/components/schemas/Rejection'
       responses:
         '200': { description: Audit-recorded approval or rejection }
 components:
+  schemas:
+    Approval:
+      type: object
+      required: [action, publicFields]
+      properties:
+        action: { type: string, const: approve }
+        publicFields:
+          type: object
+          required: [id, imageApproved]
+          properties:
+            id: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+            imageApproved: { type: boolean }
+            updatedAt: { type: [string, 'null'], format: date }
+    Rejection:
+      type: object
+      required: [action, reason]
+      properties:
+        action: { type: string, const: reject }
+        reason: { type: string, minLength: 1 }
   securitySchemes:
     reviewerBearer: { type: http, scheme: bearer }
