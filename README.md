@@ -39,7 +39,7 @@ pnpm dlx wrangler secret put REVIEWER_TOKEN
 pnpm dlx wrangler dev
 ```
 
-发布 PR 的 Git 操作仍应放在独立任务执行器中；Workers 版本通过 GitHub API 和短期令牌创建任务，不在 Worker 内执行本地 Git worktree。
+审核批准会在 D1 中创建唯一的 `publish` 任务；管理员可通过 `/v1/admin/publications` 查询、重试失败任务，并为已合并任务创建 `revert` 任务。发布 PR 的 Git 操作仍应放在独立任务执行器中；Workers 版本通过 GitHub API 和短期令牌创建任务，不在 Worker 内执行本地 Git worktree。
 
 ## API
 
