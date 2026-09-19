@@ -45,26 +45,23 @@ paths:
                 - $ref: '#/components/schemas/Rejection'
       responses:
         '200': { description: Audit-recorded approval or rejection }
-  /v1/admin/publications:
+  /v1/admin/submissions/{id}/image:
     get:
-      security: [{ reviewerBearer: [] }]
-      responses:
-        '200': { description: Publication task list }
-  /v1/admin/publications/{id}/{action}:
-    post:
       security: [{ reviewerBearer: [] }]
       parameters:
         - in: path
           name: id
           required: true
           schema: { type: string, format: uuid }
-        - in: path
-          name: action
-          required: true
-          schema: { type: string, enum: [retry, revert] }
       responses:
-        '200': { description: Publication task queued for retry }
-        '202': { description: Revert task queued }
+        '200':
+          description: 待审图片的原始字节，仅对已认证审核者返回
+          content:
+            image/jpeg: {}
+            image/png: {}
+            image/webp: {}
+        '401': { description: 缺少或错误的审核者令牌 }
+        '404': { description: 投稿或图片不存在 }
 components:
   schemas:
     Approval:

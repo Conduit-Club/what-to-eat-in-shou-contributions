@@ -70,6 +70,23 @@ function applyPlan(site, plan) {
   return next;
 }
 
+/**
+ * 第二个出口：直接读贡献服务数据目录里已批准的记录。
+ * 服务的记录形状是 { id, metadata, imageKey, status, publicFields }，这里补上导出需要的图片字节，
+ * 与 GitHub 渠道的审核记录集合汇成同一个 records 数组，后续计划生成完全共用。
+ */
+export async function readApprovedRecords(dataDir) {
+  const directory = join(dataDir, 'records');
+  const records = [];
+  for (const file of (await readdir(directory).catch(() => [])).filter((name) => name.endsWith('.json')).sort()) {
+    const record = JSON.parse(await readFile(join(directory, file), 'utf8'));
+    if (record.status !== 'approved') continue;
+    const image = record.publicFields?.imageApproved && record.imageKey ? { buffer: await readFile(join(dataDir, record.imageKey)) } : null;
+    records.push({ ...record, image });
+  }
+  return records;
+}
+
 /** Validate the reviewed-records envelope; per-record fields are checked by site-plan. */
 export function parseReviewedRecords(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('审核记录文件必须是 JSON 对象。');

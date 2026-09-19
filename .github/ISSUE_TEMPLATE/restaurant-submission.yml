@@ -1,0 +1,78 @@
+name: 提交餐厅信息
+description: 用 GitHub 账号提交一家食堂窗口或校外餐厅，维护者会转成站点内容
+title: "[投稿] "
+labels: ["投稿"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        不需要 GitHub 账号也能投稿：用本站的投稿表单提交即可。这里适合已经登录 GitHub、愿意留下记录的同学。
+
+        只写你亲自吃过或亲眼看到的窗口与价格。没有把握的信息留空，比猜一个数字好。
+  - type: input
+    id: name
+    attributes:
+      label: 名称
+      description: 窗口或店名，例如「一餐 铁板饭」。
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: 范围
+      options:
+        - 校内
+        - 校外
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: 位置
+      description: 写到能让人走到的程度，例如「二餐二楼进门右手边第三个窗口」。
+    validations:
+      required: true
+  - type: textarea
+    id: taste
+    attributes:
+      label: 口感
+      description: 你自己吃到什么就是什么，不需要写成点评。
+    validations:
+      required: true
+  - type: input
+    id: price
+    attributes:
+      label: 价格
+      description: 写清单位和分量，例如「铁板鸡排 8 元一份」。不确定就留空。
+    validations:
+      required: false
+  - type: input
+    id: hours
+    attributes:
+      label: 营业时间
+      description: 不确定就留空。
+    validations:
+      required: false
+  - type: input
+    id: visited-at
+    attributes:
+      label: 用餐日期
+      description: 形如 2026-09-19，用于区分价格是什么时候的。
+    validations:
+      required: true
+  - type: textarea
+    id: image
+    attributes:
+      label: 图片
+      description: |
+        直接把图片拖进来即可，并说明这张图是不是你拍的、能不能公开使用。
+        没有图片也能投稿。不要上传别人的图。
+    validations:
+      required: false
+  - type: checkboxes
+    id: license
+    attributes:
+      label: 授权与真实性
+      options:
+        - label: 以上信息来自我个人经历，图片由我拍摄并同意公开使用。
+          required: false
