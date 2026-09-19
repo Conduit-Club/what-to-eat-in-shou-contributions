@@ -8,7 +8,7 @@ export function createNewRestaurantPlan({ record, image, site }) {
   invariant(record.status === 'approved' && record.publicFields, 409, 'not_exportable', '只有已批准且包含公开字段的投稿可以导出。');
   const publication = record.publicFields;
   validatePublication(publication, publication);
-  const extension = imageExtension(record.imageKey);
+  const extension = publication.imageApproved ? imageExtension(record.imageKey) : null;
   const snapshot = publicSnapshot(publication, extension);
   const restaurants = parseRestaurants(site.restaurantsJson);
   invariant(!restaurants.some((restaurant) => restaurant.id === snapshot.id), 409, 'restaurant_exists', '该餐厅 ID 已存在，应使用已有餐厅导出流程。');
