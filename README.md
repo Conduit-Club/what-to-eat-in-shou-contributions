@@ -46,3 +46,20 @@ pnpm dlx wrangler dev
 `POST /v1/submissions` 接受 `multipart/form-data` 的 `metadata`（JSON 字符串）和一张 `image`。图片必须是真实 JPEG、PNG 或 WebP，且不超过 5 MiB。成功只表示进入审核队列：`202 {"id":"...","status":"pending"}`。
 
 审核接口位于 `/v1/admin/submissions`，使用 `Authorization: Bearer <token>`。完整机器可读契约见 [openapi.yaml](./openapi.yaml)，安全边界与后续 PostgreSQL/S3/PR 导出要求见 [contribution-service-handoff.md](./contribution-service-handoff.md)。
+
+## 审核记录与导出
+
+`data/reviewed/` 保存审核结果的种子文件，`scripts/plan-export.js` 依据审核记录和站点仓库文件生成站点变更计划：
+
+```bash
+pixi run node scripts/plan-export.js \
+  --records data/reviewed/canteen-windows-2026-09.json \
+  --site ../what-to-eat-in-shou-today \
+  --out /tmp/shou-plan
+```
+
+该命令只读站点仓库、只写输出目录，不创建分支、不推送、不开 PR。本轮审核过程、导出结果与已知差异见 [reviewed-content.md](./reviewed-content.md)。
+
+## 部署
+
+两个仓库的部署步骤、所需密钥和 CI 说明见 [deployment.md](./deployment.md)。仓库内 `.github/workflows/verify.yml` 只做检查，`.github/workflows/deploy-worker.yml` 在配置 Cloudflare 凭据后才会真正部署。
