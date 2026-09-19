@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: What to Eat in SHOU Contributions API
+  version: 1.0.0
+paths:
+  /v1/submissions:
+    post:
+      summary: Submit one restaurant experience for moderation
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [metadata, image]
+              properties:
+                metadata: { type: string, contentMediaType: application/json }
+                image: { type: string, contentMediaType: image/* }
+      responses:
+        '202': { description: Accepted into the pending moderation queue }
+        '400': { description: Invalid multipart body }
+        '413': { description: Image exceeds 5 MiB }
+        '422': { description: Invalid metadata or image bytes }
+        '429': { description: Rate limited }
+  /v1/admin/submissions:
+    get:
+      security: [{ reviewerBearer: [] }]
+      responses:
+        '200': { description: Moderation queue }
+  /v1/admin/submissions/{id}/review:
+    post:
+      security: [{ reviewerBearer: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/Approval'
+                - $ref: '#/components/schemas/Rejection'
+      responses:
+        '200': { description: Audit-recorded approval or rejection }
+  /v1/admin/publications:
+    get:
+      security: [{ reviewerBearer: [] }]
+      responses:
+        '200': { description: Publication task list }
+  /v1/admin/publications/{id}/{action}:
+    post:
+      security: [{ reviewerBearer: [] }]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: action
+          required: true
+          schema: { type: string, enum: [retry, revert] }
+      responses:
+        '200': { description: Publication task queued for retry }
+        '202': { description: Revert task queued }
+components:
+  schemas:
+    Approval:
+      type: object
+      required: [action, publicFields]
+      properties:
+        action: { type: string, const: approve }
+        publicFields:
+          type: object
+          required: [id, imageApproved]
+          properties:
+            id: { type: string, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' }
+            imageApproved: { type: boolean }
+            updatedAt: { type: [string, 'null'], format: date }
+    Rejection:
+      type: object
+      required: [action, reason]
+      properties:
+        action: { type: string, const: reject }
+        reason: { type: string, minLength: 1 }
+  securitySchemes:
+    reviewerBearer: { type: http, scheme: bearer }
