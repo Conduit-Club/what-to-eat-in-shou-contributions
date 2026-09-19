@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "kind": "reviewed-restaurant-records",
+  "collectedAt": "2026-09-19",
+  "source": {
+    "type": "public-social-post",
+    "platform": "小红书",
+    "description": "上海海洋大学一餐、二餐美食推荐帖子及其评论的公开截图",
+    "url": null,
+    "authorIdentitiesVerified": false,
+    "imageReuse": "not-approved",
+    "note": "只整理公开可见的窗口、餐品与同学分享的价格，匿名署名对应到公开站点；未取得图片再利用授权，因此 imageApproved 全部为 false。"
+  },
+  "records": [
+    {
+      "status": "approved",
+      "imageKey": null,
+      "image": null,
+      "publicFields": {
+        "id": "first-canteen",
+        "name": "一食堂",
+        "category": "on-campus",
+        "location": "本科生宿舍区附近的第一食堂，窗口分布在一楼和二楼。",
+        "taste": "同学反馈：一餐一楼的窗口基本不踩雷，二楼的酸菜鱼和滑蛋饭也不错。",
+        "openingHours": null,
+        "visitedAt": null,
+        "updatedAt": null,
+        "price": "- 一楼铁板饭、铁板鸡排：约 8 元/份。\n- 一楼锅贴：约 1 元至 1.5 元/个，更早的时候是 1 元。\n- 二楼酸菜鱼：约 19 元/份。\n- 其余窗口和现价待补充。\n- 价格来自同学，未对过现场价目表。",
+        "imageApproved": false
+      }
+    },
+    {
+      "status": "approved",
+      "imageKey": null,
+      "image": null,
+      "publicFields": {
+        "id": "second-canteen",
+        "name": "二食堂",
+        "category": "on-campus",
+        "location": "本科生宿舍区附近的第二食堂，一楼和二楼都有窗口。",
+        "taste": "同学反馈：二餐二楼的炸鸡、酸辣粉、凉皮评价都不错，砂锅也有人喜欢。",
+        "openingHours": null,
+        "visitedAt": null,
+        "updatedAt": null,
+        "price": "- 二楼风味餐厅牛肉面：约 8 元/碗。\n- 其余窗口和现价待补充。\n- 价格来自同学，未对过现场价目表。",
+        "imageApproved": false
+      }
+    },
+    {
+      "status": "approved",
+      "imageKey": null,
+      "image": null,
+      "publicFields": {
+        "id": "flavor-restaurant",
+        "name": "风味餐厅",
+        "category": "on-campus",
+        "location": "第二食堂二楼，靠近外侧的窗口，新疆风味。",
+        "taste": "同学反馈：牛肉面好吃，羊肉泡馍汤鲜、料多，都有人推荐。",
+        "openingHours": null,
+        "visitedAt": null,
+        "updatedAt": null,
+        "price": "- 牛肉面：约 8 元/碗。\n- 其余菜品和现价待补充。\n- 价格来自同学，未对过现场价目表。",
+        "imageApproved": false
+      }
+    }
+  ]
+}

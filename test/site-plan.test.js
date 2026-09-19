@@ -36,6 +36,13 @@ test('does not export an image that lacks explicit publication permission', () =
   assert.equal(JSON.parse(plan.changes[0].content).find((item) => item.id === 'first-canteen').image, null);
 });
 
+test('exports a record whose image was never stored when the image is not approved', () => {
+  const unapproved = { ...record, imageKey: null, publicFields: { ...record.publicFields, imageApproved: false } };
+  const plan = createNewRestaurantPlan({ record: unapproved, site });
+  assert.equal(JSON.parse(plan.changes[0].content).find((item) => item.id === 'first-canteen').image, null);
+  assert.throws(() => createNewRestaurantPlan({ record: { ...unapproved, publicFields: { ...unapproved.publicFields, imageApproved: true } }, site }), { code: 'invalid_image_key' });
+});
+
 test('refuses to overwrite an existing restaurant ID', () => {
   assert.throws(() => createNewRestaurantPlan({ record: { ...record, publicFields: { ...record.publicFields, id: 'changfen' } }, image: { buffer: Buffer.from('image-data') }, site }), { code: 'restaurant_exists' });
 });
