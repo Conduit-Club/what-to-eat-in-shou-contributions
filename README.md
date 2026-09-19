@@ -47,6 +47,14 @@ pnpm dlx wrangler dev
 
 审核接口位于 `/v1/admin/submissions`，使用 `Authorization: Bearer <token>`。完整机器可读契约见 [openapi.yaml](./openapi.yaml)，安全边界与后续 PostgreSQL/S3/PR 导出要求见 [contribution-service-handoff.md](./contribution-service-handoff.md)。
 
+## 审核台
+
+服务自带一个审核页面，打开 `http://localhost:3001/admin/`（生产环境为服务自己的域名加 `/admin/`）。在页面里填入 `REVIEWER_TOKENS` 中的任一令牌即可加载待审列表、查看投稿图片、批准或拒绝。
+
+页面由投稿服务提供，不进入公开站点，令牌由审核者手动输入并只保存在当前标签页的 `sessionStorage`，页面和仓库都不写入凭据。查看图片走 `GET /v1/admin/submissions/{id}/image`，同样需要令牌。
+
+批准时页面会要求填写稳定标识、名称、位置和以「同学反馈：」开头的口感；批准只记录公开字段，导出仍需按下一节单独执行。
+
 ## 审核记录与导出
 
 `data/reviewed/` 保存审核结果的种子文件，`scripts/plan-export.js` 依据审核记录和站点仓库文件生成站点变更计划：

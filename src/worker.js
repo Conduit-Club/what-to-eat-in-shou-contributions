@@ -1,6 +1,8 @@
 import { validateMetadata } from './domain/metadata.js';
 import { validateAndSanitizeImage } from './domain/image.js';
 import { validatePublication } from './domain/publication.js';
+import { adminUiHtml } from './http/admin-ui.js';
+import { imageContentType } from './http/content-type.js';
 import { HttpError } from './errors.js';
 
 const maxImageBytes = 5 * 1024 * 1024;
@@ -10,10 +12,11 @@ export default {
   async fetch(request, env) {
     try {
       const origin = request.headers.get('Origin');
-      const allowed = (env.ALLOWED_ORIGINS || '').split(',').map((value) => value.trim()).filter(Boolean);
-      if (origin && !allowed.includes(origin)) throw new HttpError(403, 'origin_not_allowed', 'Origin 不被允许。');
-      if (request.method === 'OPTIONS') return response(null, 204, corsHeaders(origin));
       const url = new URL(request.url);
+      const allowed = (env.ALLOWED_ORIGINS || '').split(',').map((value) => value.trim()).filter(Boolean);
+      if (origin && !allowed.includes(origin) && !isSameOrigin(origin, url.host)) throw new HttpError(403, 'origin_not_allowed', 'Origin 不被允许。');
+      if (request.method === 'OPTIONS') return response(null, 204, corsHeaders(origin));
+      if (request.method === 'GET' && (url.pathname === '/admin/' || url.pathname === '/admin')) return new Response(adminUiHtml, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' } });
       if (request.method === 'POST' && url.pathname === '/v1/submissions') return await submit(request, env, origin);
       if (url.pathname.startsWith('/v1/admin/')) {
         authenticate(request, env);
@@ -21,6 +24,8 @@ export default {
         if (request.method === 'GET' && url.pathname === '/v1/admin/publications') return await publicationList(env, origin);
         const route = /^\/v1\/admin\/submissions\/([^/]+)\/review$/.exec(url.pathname);
         if (request.method === 'POST' && route) return await review(request, env, route[1], origin);
+        const imageRoute = /^\/v1\/admin\/submissions\/([^/]+)\/image$/.exec(url.pathname);
+        if (request.method === 'GET' && imageRoute) return await image(env, imageRoute[1], origin);
         const publicationRoute = /^\/v1\/admin\/publications\/([^/]+)\/(retry|revert)$/.exec(url.pathname);
         if (request.method === 'POST' && publicationRoute) return await publicationAction(env, publicationRoute[1], publicationRoute[2], origin);
       }
@@ -73,6 +78,14 @@ async function review(request, env, id, origin) {
   return response({ submission: { ...row(existing), status, publicFields }, publication: body.action === 'approve' ? { status: 'queued' } : null }, 200, corsHeaders(origin));
 }
 
+async function image(env, id, origin) {
+  const existing = await env.DB.prepare('SELECT image_key FROM submissions WHERE id = ?').bind(id).first();
+  if (!existing) throw new HttpError(404, 'not_found', '投稿不存在。');
+  const object = await env.PENDING_IMAGES.get(existing.image_key);
+  if (!object) throw new HttpError(404, 'not_found', '待审图片不存在。');
+  return new Response(object.body, { status: 200, headers: { 'Content-Type': imageContentType(existing.image_key), 'Cache-Control': 'no-store', ...corsHeaders(origin) } });
+}
+
 async function publicationList(env, origin) {
   const result = await env.DB.prepare('SELECT * FROM publication_jobs ORDER BY created_at ASC').all();
   return response({ publications: result.results.map(publicationRow) }, 200, corsHeaders(origin));
@@ -101,4 +114,5 @@ function authenticate(request, env) {
 function row(value) { return { id: value.id, metadata: typeof value.metadata === 'string' ? JSON.parse(value.metadata) : value.metadata, status: value.status, publicFields: value.public_fields ? JSON.parse(value.public_fields) : value.publicFields || null, createdAt: value.created_at, updatedAt: value.updated_at }; }
 function publicationRow(value) { return { id: value.id, submissionId: value.submission_id, operation: value.operation, status: value.status, pullRequestNumber: value.pull_request_number ?? null, pullRequestUrl: value.pull_request_url ?? null, branch: value.branch ?? null, commitSha: value.commit_sha ?? null, mergeCommitSha: value.merge_commit_sha ?? null, error: value.error ?? null, createdAt: value.created_at, updatedAt: value.updated_at }; }
 function corsHeaders(origin) { return origin ? { 'Access-Control-Allow-Origin': origin, Vary: 'Origin' } : {}; }
+function isSameOrigin(origin, host) { if (!host) return false; try { return new URL(origin).host === host; } catch { return false; } }
 function response(data, status, headers = {}) { return new Response(data === null ? null : JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } }); }
