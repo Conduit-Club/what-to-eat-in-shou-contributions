@@ -50,13 +50,19 @@ function stripPngExif(buffer) {
 }
 
 function stripWebpExif(buffer) {
-  const chunks = [buffer.subarray(0, 12)]; let offset = 12;
+  // 头部固定 12 字节：RIFF、小端长度、WEBP。复制一份再改，避免改到调用方传入的字节。
+  const header = Buffer.from(buffer.subarray(0, 12));
+  const chunks = []; let offset = 12;
   while (offset + 8 <= buffer.length) {
-    const size = buffer.readUInt32LE(offset); const padded = size + (size % 2); const end = offset + 8 + padded;
+    // 块布局是 fourcc + 小端长度，长度在 offset + 4；以前读的是 offset，等于把 fourcc 当长度，
+    // 每个 WebP 都被判成损坏文件，WebP 投稿全部失败。
+    const size = buffer.readUInt32LE(offset + 4); const padded = size + (size % 2); const end = offset + 8 + padded;
     if (end > buffer.length) throw new HttpError(422, 'invalid_image', 'WebP 文件损坏。');
     if (buffer.subarray(offset, offset + 4).toString() !== 'EXIF') chunks.push(buffer.subarray(offset, end));
     offset = end;
   }
-  const body = Buffer.concat(chunks.slice(1)); body.copy(chunks[0], 4); chunks[0].writeUInt32LE(body.length + 4, 4);
-  return Buffer.concat([chunks[0], body]);
+  const body = Buffer.concat(chunks);
+  // RIFF 长度字段记录的是文件总长减 8，也就是 12 字节头部之后的内容再加 4。
+  header.writeUInt32LE(body.length + 4, 4);
+  return Buffer.concat([header, body]);
 }
