@@ -62,26 +62,6 @@ paths:
             image/webp: {}
         '401': { description: 缺少或错误的审核者令牌 }
         '404': { description: 投稿或图片不存在 }
-  /v1/admin/publications:
-    get:
-      security: [{ reviewerBearer: [] }]
-      responses:
-        '200': { description: Publication task list }
-  /v1/admin/publications/{id}/{action}:
-    post:
-      security: [{ reviewerBearer: [] }]
-      parameters:
-        - in: path
-          name: id
-          required: true
-          schema: { type: string, format: uuid }
-        - in: path
-          name: action
-          required: true
-          schema: { type: string, enum: [retry, revert] }
-      responses:
-        '200': { description: Publication task queued for retry }
-        '202': { description: Revert task queued }
 components:
   schemas:
     Approval:
