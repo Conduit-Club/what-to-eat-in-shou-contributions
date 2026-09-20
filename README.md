@@ -4,20 +4,23 @@
 
 ## 结构
 
-一个 Node 进程，一个数据目录，没有数据库、没有对象存储、没有第二个运行时，也没有第三方运行时依赖：
+服务核心是一个 Node 进程，只依赖抽象端口；具体存储实现可在组合根注入，仓库自带本地文件适配器作为默认实现：
 
 ```text
-src/main.js              进程入口，读环境变量后启动
+src/main.js              进程入口，从组合根取适配器后启动
+src/composition.js       组合根：默认文件适配器或 CONTRIB_ADAPTERS 外部注入
+src/ports/               RecordStore、ImageStore、AuditLog、RateLimiter、Clock、IdGenerator、GitHubClient 端口契约
 src/http/server.js       六个接口加审核台页面
 src/http/admin-ui.js     审核台，纯静态页
 src/http/multipart.js    投稿请求体解析
-src/domain/              元数据、图片、公开字段的校验
-src/adapters/            record-store.js（投稿与审计）、image-store.js（私有原图）
+src/domain/              元数据、图片、公开字段、审核用例与公开投影
+src/adapters/            默认本地实现：文件记录仓储、私有图片目录、文件审计、内存限流、系统时钟、UUID 生成
 src/export/              站点变更计划、GitHub PR 客户端
-scripts/plan-export.js   导出命令
+scripts/plan-export.js   导出命令（--records / --data-dir / --adapter）
+adapter-contract.md      外部适配器实现契约
 ```
 
-数据目录：
+默认文件适配器的数据目录：
 
 ```text
 <数据目录>/records/<投稿 ID>.json    所有投稿，status 决定状态
@@ -39,14 +42,22 @@ pixi run check
 DATA_DIR=.data REVIEWER_TOKENS=local-dev-token ALLOWED_ORIGINS=http://localhost:3000 pixi run start
 ```
 
-默认监听 `3001`，数据目录默认 `.data`，它必须在仓库外或已被忽略，不要提交。生产只需再加 HTTPS 与反向代理：
+默认监听 `3001`，数据目录默认 `.data`，它必须在仓库外或已被忽略，不要提交。默认本地实现只需再加 HTTPS 与反向代理：
 
 ```bash
 PORT=3001 DATA_DIR=/var/lib/shou-contributions \
 REVIEWER_TOKENS=<强随机令牌> ALLOWED_ORIGINS=https://<站点来源> pixi run start
 ```
 
-限流按来源地址在进程内计数，单实例够用；要多实例时应在反向代理或网关上做限流。
+注入外部存储实现时设置 `CONTRIB_ADAPTERS`，模块形状见 [adapter-contract.md](./adapter-contract.md)：
+
+```bash
+PORT=3001 CONTRIB_ADAPTERS=@shou/contrib-adapters \
+DATABASE_URL=<数据库连接> IMAGE_BUCKET=<图片桶> \
+REVIEWER_TOKENS=<强随机令牌> ALLOWED_ORIGINS=https://<站点来源> pixi run start
+```
+
+限流默认按来源地址在进程内计数，单实例够用；多实例或函数平台应通过外部适配器注入 Redis 等实现。
 
 ## API
 
@@ -65,8 +76,11 @@ REVIEWER_TOKENS=<强随机令牌> ALLOWED_ORIGINS=https://<站点来源> pixi ru
 不需要 GitHub 账号的同学用投稿服务；已经登录 GitHub 的同学用仓库的 Issue 表单。两条渠道在导出前汇成同一个 `records` 数组，计划生成完全共用：
 
 ```bash
-# 服务渠道：直接读数据目录里已批准的记录
+# 服务渠道默认实现：直接读数据目录里已批准的记录
 pixi run node scripts/plan-export.js --data-dir .data --site ../what-to-eat-in-shou-today --out /tmp/shou-plan
+
+# 服务渠道外部实现：注入适配器模块
+pixi run node scripts/plan-export.js --adapter @shou/contrib-adapters --site ../what-to-eat-in-shou-today --out /tmp/shou-plan
 
 # Issue 渠道或人工整理的批次
 pixi run node scripts/plan-export.js --records data/reviewed/canteen-windows-2026-09.json --site ../what-to-eat-in-shou-today --out /tmp/shou-plan

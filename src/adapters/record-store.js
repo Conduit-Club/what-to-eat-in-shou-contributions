@@ -1,22 +1,22 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { randomUUID } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { HttpError } from '../errors.js';
+import { publicRecord } from '../domain/record.js';
+import { SystemClock } from './system-clock.js';
+import { CryptoIdGenerator } from './crypto-id-generator.js';
+
+export { publicRecord } from '../domain/record.js';
 
 /**
- * 投稿记录仓储：一个数据目录，一个 records 目录，状态写在记录里。
- *
- *   <root>/records/<投稿 ID>.json   所有投稿，status 决定它处在哪个阶段
- *   <root>/audits/<时间>-<随机>.json 审核审计，只追加，不修改也不删除
- *
- * 状态不放在目录名里，所以审核只是改一个文件的内容，没有「搬到一半」的中间态。
- * 代价是列出待审要读完所有记录；校园投稿量下这是几十个文件，可以接受。
+ * RecordStore 端口的默认实现：`<root>/records/<投稿 ID>.json`。
+ * 状态写在记录里，审核只是改一个文件的内容，没有「搬到一半」的中间态。
+ * 审计由独立的 FileAuditLog 负责，不在本类里写。
  */
 export class FileRecordStore {
-  constructor({ root, now = () => new Date().toISOString(), randomId = () => randomUUID() }) {
+  constructor({ root, clock = new SystemClock(), idGenerator = new CryptoIdGenerator() }) {
     this.root = resolve(root);
-    this.now = now;
-    this.randomId = randomId;
+    this.clock = clock;
+    this.idGenerator = idGenerator;
   }
 
   #recordsDir() { return join(this.root, 'records'); }
@@ -33,8 +33,8 @@ export class FileRecordStore {
   }
 
   async create(metadata, imageKey) {
-    const createdAt = this.now();
-    const record = { id: this.randomId(), metadata, imageKey, status: 'pending', publicFields: null, createdAt, updatedAt: createdAt };
+    const createdAt = this.clock.now();
+    const record = { id: this.idGenerator.randomId(), metadata, imageKey, status: 'pending', publicFields: null, createdAt, updatedAt: createdAt };
     await this.#write(this.#recordPath(record.id), record);
     return record;
   }
@@ -42,36 +42,25 @@ export class FileRecordStore {
   async get(id) { return this.#read(id); }
 
   async list(status) {
+    return (await this.listRecords(status)).map(publicRecord);
+  }
+
+  /** 完整记录列表（含 imageKey），只给可信内部消费者（导出管线）使用。 */
+  async listRecords(status) {
     const files = await readdir(this.#recordsDir()).catch(() => []);
     const records = [];
     for (const file of files.filter((name) => name.endsWith('.json'))) {
       const record = JSON.parse(await readFile(join(this.#recordsDir(), file), 'utf8'));
       if (!status || record.status === status) records.push(record);
     }
-    return records.sort((left, right) => (left.createdAt < right.createdAt ? -1 : 1)).map(publicRecord);
+    return records.sort((left, right) => (left.createdAt < right.createdAt ? -1 : 1));
   }
 
-  async review(id, action, reviewer, reason, publicFields) {
+  /** 只负责持久化；审核校验与审计顺序由 domain/review.js 负责。 */
+  async review(id, action, reviewer, reason, publicFields, reviewedAt = this.clock.now()) {
     const record = await this.#read(id);
-    if (record.status !== 'pending') throw new HttpError(409, 'invalid_state', '该投稿已审核。');
-    if (!['approve', 'reject'].includes(action)) throw new HttpError(422, 'invalid_action', 'action 必须为 approve 或 reject。');
-    if (action === 'reject' && !reason?.trim()) throw new HttpError(422, 'missing_rejection_reason', '拒绝投稿时必须填写原因。');
-    const reviewedAt = this.now();
-    // 先写审计再改记录：审计是审核行为的凭据，宁可留下一条对应不上状态的记录，也不能反过来。
-    await this.#write(join(this.root, 'audits', `${reviewedAt.replace(/:/g, '')}-${this.randomId()}.json`), { id: this.randomId(), submissionId: id, action, reviewer, reason: reason?.trim() || null, createdAt: reviewedAt });
     const reviewed = { ...record, status: action === 'approve' ? 'approved' : 'rejected', publicFields: publicFields ?? null, updatedAt: reviewedAt };
     await this.#write(this.#recordPath(id), reviewed);
     return reviewed;
   }
-
-  async listAudits() {
-    const files = await readdir(join(this.root, 'audits')).catch(() => []);
-    const audits = [];
-    for (const file of files.filter((name) => name.endsWith('.json'))) {
-      audits.push(JSON.parse(await readFile(join(this.root, 'audits', file), 'utf8')));
-    }
-    return audits.sort((left, right) => (left.createdAt < right.createdAt ? -1 : 1));
-  }
 }
-
-export function publicRecord(record) { const { imageKey, ...safe } = record; return safe; }

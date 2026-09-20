@@ -6,15 +6,29 @@ import { join } from 'node:path';
 import { createApp } from '../src/http/server.js';
 import { FileRecordStore } from '../src/adapters/record-store.js';
 import { PrivateImageStore } from '../src/adapters/image-store.js';
+import { FileAuditLog } from '../src/adapters/file-audit-log.js';
+import { MemoryRateLimiter } from '../src/adapters/memory-rate-limiter.js';
+import { SystemClock } from '../src/adapters/system-clock.js';
+import { CryptoIdGenerator } from '../src/adapters/crypto-id-generator.js';
 
 const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
 const metadata = { schemaVersion: 1, name: '一食堂', category: 'on-campus', location: '一食堂一楼', taste: '面条口感不错。', openingHours: '待补充', visitedAt: '2026-09-16', imageFilename: 'client-name.png' };
 async function fixture(options = {}) {
   const root = await mkdtemp(join(tmpdir(), 'contributions-'));
   const repository = new FileRecordStore({ root });
-  const app = createApp({ repository, storage: new PrivateImageStore({ root }), allowedOrigins: ['https://food.example.test'], reviewerTokens: ['reviewer-secret'], rateLimit: options.rateLimit || { windowMs: 60_000, max: 10 } });
+  const storage = new PrivateImageStore({ root });
+  const auditLog = new FileAuditLog({ root, idGenerator: new CryptoIdGenerator() });
+  const app = createApp({
+    repository,
+    storage,
+    auditLog,
+    clock: new SystemClock(),
+    rateLimiter: new MemoryRateLimiter(options.rateLimit || { windowMs: 60_000, max: 10 }),
+    allowedOrigins: ['https://food.example.test'],
+    reviewerTokens: ['reviewer-secret'],
+  });
   await new Promise((resolve) => app.listen(0, '127.0.0.1', resolve));
-  return { root, repository, app, url: `http://127.0.0.1:${app.address().port}`, close: () => new Promise((resolve) => app.close(resolve)), cleanup: () => rm(root, { recursive: true, force: true }) };
+  return { root, repository, auditLog, app, url: `http://127.0.0.1:${app.address().port}`, close: () => new Promise((resolve) => app.close(resolve)), cleanup: () => rm(root, { recursive: true, force: true }) };
 }
 function form(data = metadata, image = jpeg, type = 'image/jpeg') { const body = new FormData(); body.set('metadata', JSON.stringify(data)); body.set('image', new Blob([image], { type }), 'ignored.png'); return body; }
 
@@ -22,7 +36,7 @@ test('accepts a real JPEG, keeps it private, and returns only queue state', asyn
 test('rejects declared MIME type that does not match file bytes', async () => { const ctx = await fixture(); try { const response = await fetch(`${ctx.url}/v1/submissions`, { method: 'POST', body: form(metadata, Buffer.from('not an image')) }); assert.equal(response.status, 422); assert.equal((await response.json()).error.code, 'invalid_image'); } finally { await ctx.close(); await ctx.cleanup(); } });
 test('rejects an invalid calendar date', async () => { const ctx = await fixture(); try { const response = await fetch(`${ctx.url}/v1/submissions`, { method: 'POST', body: form({ ...metadata, visitedAt: '2026-02-30' }) }); assert.equal(response.status, 422); } finally { await ctx.close(); await ctx.cleanup(); } });
 test('enforces CORS origin and anonymous rate limit', async () => { const ctx = await fixture({ rateLimit: { windowMs: 60_000, max: 1 } }); try { const badOrigin = await fetch(`${ctx.url}/v1/submissions`, { method: 'POST', body: form(), headers: { Origin: 'https://other.example.test' } }); assert.equal(badOrigin.status, 403); const first = await fetch(`${ctx.url}/v1/submissions`, { method: 'POST', body: form() }); assert.equal(first.status, 202); const second = await fetch(`${ctx.url}/v1/submissions`, { method: 'POST', body: form() }); assert.equal(second.status, 429); } finally { await ctx.close(); await ctx.cleanup(); } });
-test('requires reviewer authentication and records a rejection reason', async () => { const ctx = await fixture(); try { const submission = await fetch(`${ctx.url}/v1/submissions`, { method: 'POST', body: form() }); const { id } = await submission.json(); const unauthenticated = await fetch(`${ctx.url}/v1/admin/submissions`, { headers: { Authorization: 'Bearer wrong' } }); assert.equal(unauthenticated.status, 401); const missingReason = await fetch(`${ctx.url}/v1/admin/submissions/${id}/review`, { method: 'POST', headers: { Authorization: 'Bearer reviewer-secret', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reject' }) }); assert.equal(missingReason.status, 422); const reviewed = await fetch(`${ctx.url}/v1/admin/submissions/${id}/review`, { method: 'POST', headers: { Authorization: 'Bearer reviewer-secret', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reject', reason: '图片无法辨识。' }) }); assert.equal(reviewed.status, 200); assert.equal((await reviewed.json()).submission.status, 'rejected'); assert.equal((await ctx.repository.listAudits()).length, 1); } finally { await ctx.close(); await ctx.cleanup(); } });
+test('requires reviewer authentication and records a rejection reason', async () => { const ctx = await fixture(); try { const submission = await fetch(`${ctx.url}/v1/submissions`, { method: 'POST', body: form() }); const { id } = await submission.json(); const unauthenticated = await fetch(`${ctx.url}/v1/admin/submissions`, { headers: { Authorization: 'Bearer wrong' } }); assert.equal(unauthenticated.status, 401); const missingReason = await fetch(`${ctx.url}/v1/admin/submissions/${id}/review`, { method: 'POST', headers: { Authorization: 'Bearer reviewer-secret', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reject' }) }); assert.equal(missingReason.status, 422); const reviewed = await fetch(`${ctx.url}/v1/admin/submissions/${id}/review`, { method: 'POST', headers: { Authorization: 'Bearer reviewer-secret', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reject', reason: '图片无法辨识。' }) }); assert.equal(reviewed.status, 200); assert.equal((await reviewed.json()).submission.status, 'rejected'); assert.equal((await ctx.auditLog.list()).length, 1); } finally { await ctx.close(); await ctx.cleanup(); } });
 test('requires a safe publication contract before approving a submission', async () => { const ctx = await fixture(); try { const submission = await fetch(`${ctx.url}/v1/submissions`, { method: 'POST', body: form() }); const { id } = await submission.json(); const review = (publicFields) => fetch(`${ctx.url}/v1/admin/submissions/${id}/review`, { method: 'POST', headers: { Authorization: 'Bearer reviewer-secret', 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'approve', publicFields }) }); const unsafeId = await review({ id: '一食堂', imageApproved: false }); assert.equal(unsafeId.status, 422); const missingImageDecision = await review({ id: 'first-canteen' }); assert.equal(missingImageDecision.status, 422); const approved = await review({ id: 'first-canteen', imageApproved: false, updatedAt: null }); assert.equal(approved.status, 200); const result = await approved.json(); assert.deepEqual(result.submission.publicFields, { id: 'first-canteen', name: '一食堂', category: 'on-campus', location: '一食堂一楼', taste: '同学反馈：面条口感不错。', openingHours: null, visitedAt: '2026-09-16', updatedAt: null, price: '待补充。', imageApproved: false }); } finally { await ctx.close(); await ctx.cleanup(); } });
 
 test('serves the moderation UI without embedding any reviewer token', async () => { const ctx = await fixture(); try { const response = await fetch(`${ctx.url}/admin/`); assert.equal(response.status, 200); assert.match(response.headers.get('content-type'), /text\/html/); const html = await response.text(); assert.match(html, /投稿审核台/); assert.match(html, /\/v1\/admin\/submissions/); assert.equal(html.includes('reviewer-secret'), false); assert.match(html, /textContent/, '投稿内容必须用 textContent 写入，避免注入'); assert.match(html, /function checkApproval/, '批准前必须在前端校验稳定标识与口感前缀'); assert.match(html, /function publicTaste/, '口感前缀不能重复叠加'); } finally { await ctx.close(); await ctx.cleanup(); } });
