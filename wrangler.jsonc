@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "what-to-eat-in-shou-contributions",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "migrations_dir": "migrations",
+  // D1 数据库绑定：先 `wrangler d1 create shou-contributions`，把返回的 database_id 填进来。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "shou-contributions",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // R2 私有原图桶：先 `wrangler r2 bucket create shou-contributions-images`。
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "shou-contributions-images"
+    }
+  ],
+  "vars": {
+    "ALLOWED_ORIGINS": "https://<site-domain>",
+    "REVIEWER_TOKENS": "<comma-separated-tokens>"
+  }
+}

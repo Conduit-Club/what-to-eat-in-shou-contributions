@@ -96,4 +96,5 @@ pixi run node scripts/plan-export.js --records data/reviewed/canteen-windows-202
 
 ## 部署
 
-步骤、所需环境变量与 CI 说明见 [deployment.md](./deployment.md)。`.github/workflows/verify.yml` 在 PR 与推送到 `main` 时运行检查与测试。
+- Cloudflare Workers + D1 + R2 实现与部署步骤见 [deployment-cloudflare.md](./deployment-cloudflare.md)。
+- 本地 Node 单机部署与 CI 说明见 [deployment.md](./deployment.md)。`.github/workflows/verify.yml` 在 PR 与推送到 `main` 时运行检查与测试。
